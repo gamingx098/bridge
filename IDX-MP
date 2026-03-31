@@ -1,0 +1,222 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# IDX Market Primer\n",
+    "\n",
+    "**Objective**: Establish comprehensive understanding of Indonesia Stock Exchange (IDX) mechanics, key sectors, and market drivers.\n",
+    "\n",
+    "This notebook will:\n",
+    "- Analyze IDX trading mechanisms\n",
+    "- Study LQ45 and IDX30 indices for liquidity focus\n",
+    "- Examine macroeconomic factors affecting the market\n",
+    "- Perform volatility regime analysis using GARCH models\n",
+    "- Create correlation matrix between commodities and JKSE"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 🔧 Data Sources & Libraries"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Import necessary libraries\n",
+    "import yfinance as yf\n",
+    "import pandas as pd\n",
+    "import numpy as np\n",
+    "import matplotlib.pyplot as plt\n",
+    "import seaborn as sns\n",
+    "from arch import arch_model\n",
+    "from statsmodels.tsa.stattools import adfuller\n",
+    "\n",
+    "# Set display options\n",
+    "pd.set_option('display.max_columns', None)\n",
+    "%matplotlib inline"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 📈 IDX Market Mechanics Analysis"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Key IDX information\n",
+    "idx_info = {\n",
+    "    'Exchange Name': 'Indonesia Stock Exchange',\n",
+    "    'Trading Hours': 'Monday-Thursday: 09:00-12:00 & 13:30-15:49 WIB, Friday: shortened',\n",
+    "    'Settlement Period': 'T+2 (Two business days)',\n",
+    "    'Lot Size': '100 shares minimum',\n",
+    "    'Major Indices': ['Jakarta Composite Index (^JKSE)', 'LQ45', 'IDX30'],\n",
+    "    'Key Sectors': ['Financials (~40% weight)', 'Commodities', 'Consumer']\n",
+    "}\n",
+    "\n",
+    "# Display info\n",
+    "for key, value in idx_info.items():\n",
+    "    print(f\"{key}: {value}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 📊 LQ45 and IDX30 Analysis"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Fetch some key stocks\n",
+    "stocks = ['BBCA.JK', 'TLKM.JK', 'ASII.JK']\n",
+    "\n",
+    "# Download data\n",
+    "data = yf.download(stocks, start='2023-01-01', end='2024-01-01')\n",
+    "print(data.head())"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 📉 Volatility Regime Analysis (GARCH)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Function to analyze volatility\n",
+    "def garch_vol_analysis(ticker):\n",
+    "    # Download data\n",
+    "    df = yf.download(ticker, start='2018-01-01', end='2024-01-01')\n",
+    "    \n",
+    "    # Calculate returns\n",
+    "    df['Returns'] = df['Adj Close'].pct_change()\n",
+    "    df['Log_Returns'] = np.log(df['Adj Close'] / df['Adj Close'].shift(1))\n",
+    "    \n",
+    "    # GARCH model (using ARCH package)\n",
+    "    model = arch_model(df['Returns'].dropna(), vol='Garch', p=1, o=0, q=1)\n",
+    "    fitted_model = model.fit(disp='off')\n",
+    "    \n",
+    "    print(f\"GARCH Analysis for {ticker}\")\n",
+    "    print(fitted_model.summary())\n",
+    "    return df\n",
+    "\n",
+    "# Analyze a sample stock (BBCA.JK)\n",
+    "garch_results = garch_vol_analysis('BBCA.JK')"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 📊 Correlation Matrix: Commodities vs JKSE"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Create correlation matrix with commodities\n",
+    "\n",
+    "# Sample commodity data (in practice, you'll use real-time or historical data)\n",
+    "commodities = ['CL.JK', 'GC.JK']  # Crude Oil and Gold\n",
+    "\n",
+    "# Download market data\n",
+    "try:\n",
+    "    idx_data = yf.download('^JKSE', start='2023-01-01', end='2024-01-01')\n",
+    "    \n",
+    "    # Create DataFrame with returns\n",
+    "    df_returns = pd.DataFrame()\n",
+    "    df_returns['JKSE'] = idx_data['Adj Close'].pct_change().dropna()\n",
+    "    \n",
+    "    for commodity in commodities:\n",
+    "        try:\n",
+    "            commod_data = yf.download(commodity, start='2023-01-01', end='2024-01-01')\n",
+    "            df_returns[commodity] = commod_data['Adj Close'].pct_change().dropna()\n",
+    "        except:\n",
+    "            print(f\"Could not fetch data for {commodity}\")\n",
+    "\n",
+    "    # Calculate correlation matrix\n",
+    "    corr_matrix = df_returns.corr()\n",
+    "    \n",
+    "    plt.figure(figsize=(10, 8))\n",
+    "    sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', center=0)\n",
+    "    plt.title('Correlation Matrix: Commodities vs JKSE')\n",
+    "    plt.show()\n",
+    "\n",
+    "except Exception as e:\n",
+    "    print(f\"Error fetching data: {e}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 📚 Data Dictionary and Market Drivers"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Key macroeconomic drivers\n",
+    "macro_drivers = {\n",
+    "    'BI Repo Rate': 'Bank Indonesia's 7-day repo rate - influences liquidity',\n",
+    "    'IDR/USD Exchange Rate': 'Rupiah volatility affects foreign investor sentiment',\n",
+    "    'Commodity Prices': 'Coal, palm oil, nickel prices heavily impact commodity stocks',\n",
+    "    'ASEAN/China Spillovers': 'Regional economic events affect Indonesia market',\n",
+    "    'Liquidity': 'Only LQ45 blue chips have adequate liquidity'\n",
+    "}\n",
+    "\n",
+    "for driver, description in macro_drivers.items():\n",
+    "    print(f\"{driver}: {description}\")"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3.11",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.11.0"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 2
+}
